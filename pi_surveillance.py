@@ -1,9 +1,8 @@
 #import the necessary packages
 from pyimagesearch.tempimage import TempImage
-from dropbox.client import DropboxOAuth2FlowNoRedirect
-from dropbox.client import DropboxClient
 from picamera.array import PiRGBArray
 from picamera import PiCamera
+import dropbox
 import argparse
 import warnings
 import datetime
@@ -25,14 +24,8 @@ client = None
 
 if conf["use_dropbox"]:
   #connect to dropbox and start the session authorization process
-  #flow = DropboxOAuth2FlowNoRedirect(conf["dropbox_key"], conf["dropbox_secret"])
-  #print "[INFO] Authorize this application: {}".format(flow.start())
-  #authCode = raw_input("Enter auth code here: ").strip()
-
-  #finish the authorization and grab the Dropbox client
-  #(accessToken, userID) = flow.finish(authCode)
   accessToken = conf["access_token"]
-  client = DropboxClient(accessToken)
+  client = dropbox.Dropbox(accessToken)
   print "[SUCCESS] dropbox account linked"
 
 #initialize the camera and grab a reference to the raw camera capture
@@ -115,10 +108,19 @@ for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True
           cv2.imwrite(t.path, frame)
 
           #upload the image to Dropbox and cleanup the temp image
-          print "[UPLOAD] {}".format(ts)
-          path = "{base_path}/{timestamp}.jpg".format(
+          print("[UPLOAD] {}".format(ts))
+          path = "/{base_path}/{timestamp}.jpg".format(
               base_path=conf["dropbox_base_path"], timestamp=ts)
-          client.put_file(path, open(t.path, "rb"))
+          mode = dropbox.files.WriteMode.add
+          with open(t.path, 'rb') as f:
+              data = f.read()
+          try:
+             res = client.files_upload(
+                data, path, mode, mute=True)
+          except dropbox.exceptions.ApiError as err:
+                print('*** API error', err)
+            
+          #client.put_file(path, open(t.path, "rb"))
 
           if conf["use_email"]:
               body = open("body.txt", "w+")
