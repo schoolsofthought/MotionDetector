@@ -11,15 +11,16 @@ ap.add_argument("-v", "--video", help="path to the video file")
 ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
 args = vars(ap.parse_args())
 
+
 #ifthe video argument is None, then we are reading from webcam
 if args.get("video", None) is None:
   camera = cv2.VideoCapture(0)
   time.sleep(0.25)
 
-
 #otherwise, we are reading from a video file
 else:
   camera = cv2.VideoCapture(args["video"])
+  time.sleep(2.0)
 
 #initialize the first frame in the video stream
 firstFrame = None
@@ -27,10 +28,11 @@ firstFrame = None
 #loop over the frames of the video
 while True:
   #grab the current frame and initialize the occupied/unoccupied
-  #text
+  #text  
   (grabbed, frame) = camera.read()
   text = "Unoccupied"
-  
+  print(grabbed)
+
   #if the frame could not be grabbed, then we have reached the end
   #of the video
   if not grabbed:
@@ -81,6 +83,7 @@ while True:
   if key==ord("q"):
     break
 
+print('what')
 #cleanup the camera and close any open windows
 camera.release()
 cv2.destroyAllWindows()

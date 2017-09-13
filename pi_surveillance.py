@@ -7,10 +7,12 @@ import argparse
 import warnings
 import datetime
 import imutils
+import shutil
 import json
 import time
 import cv2
 import os
+import datetime
 
 #construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
@@ -120,8 +122,7 @@ for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True
           except dropbox.exceptions.ApiError as err:
                 print('*** API error', err)
             
-          #client.put_file(path, open(t.path, "rb"))
-
+          #Send image to email address
           if conf["use_email"]:
               body = open("body.txt", "w+")
               body.write("UPLOAD {}".format(ts))
@@ -129,6 +130,17 @@ for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True
               os.system(
 		"mpack -s 'Surveillance' -d {body} {path} {email}".format(
 		body="./body.txt", path=t.path, email=conf["email"]))
+
+          #Save image to usbdrive
+          usbpath = '/mnt/usbdrive/photos'
+          dtnow = datetime.datetime.now()
+          if dtnow.hour >= 12:
+            ampm = "PM"
+          else:
+            ampm = "AM"
+          new_image_path = os.path.join(usbpath, ampm, ts + '.jpg')
+          shutil.copy2(t.path, new_image_path)
+
           t.cleanup()
 
         #update the last uploaded timestamp and reset he motion couner
