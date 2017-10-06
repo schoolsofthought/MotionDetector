@@ -12,7 +12,8 @@ import json
 import time
 import cv2
 import os
-import datetime
+import datetime as dt
+import scrape_sun
 
 #construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
@@ -46,6 +47,13 @@ motionCounter = 0
 
 #capture frames from the camera
 for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+  #Only start video capture if 
+  now = dt.now()
+  url = "https://www.timeanddate.com/sun/usa/salt-lake-city"
+  sunrise, sunset = scrape_sun.get_times(url, 'span', 'three', now)
+  if now < sunrise or now > sunset:
+    continue
+
   #grab the raw Numpy array representing the image and initialize
   #the timestamp and occupied/unoccupied text
   frame = f.array
