@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup as BS
 import datetime as dt
 
+#scrapes sunrise and sunset times from timeanddate.com URL
 def get_times(url, class_type, class_name, now):
   r = requests.get(url, timeout=10)
   soup = BS(r.content, 'html.parser')
