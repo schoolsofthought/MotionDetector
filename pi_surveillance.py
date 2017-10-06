@@ -48,7 +48,7 @@ motionCounter = 0
 #capture frames from the camera
 for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
   #Only start video capture if 
-  now = dt.now()
+  now = dt.datetime.now()
   url = "https://www.timeanddate.com/sun/usa/salt-lake-city"
   sunrise, sunset = scrape_sun.get_times(url, 'span', 'three', now)
   if now < sunrise or now > sunset:
