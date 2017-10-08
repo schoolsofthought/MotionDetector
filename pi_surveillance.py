@@ -141,8 +141,7 @@ for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True
 
           #Save image to usbdrive
           usbpath = '/mnt/usbdrive/photos'
-          dtnow = datetime.datetime.now()
-          if dtnow.hour >= 12:
+          if now.hour >= 12:
             ampm = "PM"
           else:
             ampm = "AM"
