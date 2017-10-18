@@ -4,7 +4,14 @@ import datetime as dt
 
 #scrapes sunrise and sunset times from timeanddate.com URL
 def get_times(url, class_type, class_name, now):
-  r = requests.get(url, timeout=100000)
+  try:
+    r = requests.get(url, timeout=100000)
+  except requests.exceptions.Timeout:
+    print "timed out"
+    sunrise = now.replace(hour=7,minute=00)
+    sunset = now.replace(hour=20, minute=00)
+    return sunrise, sunset
+
   soup = BS(r.content, 'html.parser')
   times = soup.find_all(class_type, {"class": class_name})
   split_times = [time.get_text().split()[0] for time in times]

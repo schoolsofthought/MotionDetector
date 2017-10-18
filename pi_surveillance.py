@@ -15,6 +15,13 @@ import os
 import datetime as dt
 import scrape_sun
 
+now = dt.datetime.now()
+current_day = now.day
+current_minute = 60
+url = "https://www.timeanddate.com/sun/usa/salt-lake-city"
+sunrise, sunset = scrape_sun.get_times(url, 'span', 'three', now)
+status = "Not time yet."
+
 #construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-c", "--conf", required=True, help="path to the JSON config file")
@@ -47,17 +54,11 @@ motionCounter = 0
 
 #capture frames from the camera
 for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
-  #Only start video capture if 
-  now = dt.datetime.now()
-  url = "https://www.timeanddate.com/sun/usa/salt-lake-city"
-  sunrise, sunset = scrape_sun.get_times(url, 'span', 'three', now)
-  if now < sunrise or now > sunset:
-    continue
 
   #grab the raw Numpy array representing the image and initialize
   #the timestamp and occupied/unoccupied text
   frame = f.array
-  timestamp = datetime.datetime.now()
+  timestamp = dt.datetime.now()
   text = "Unoccupied"
 
   #resize the frame, convert it to grayscale and blur it
@@ -85,78 +86,67 @@ for f in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True
   cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
   cnts = cnts[0] if imutils.is_cv2() else cnts[1]
 
-  #loop over the contours
-  for c in cnts:
-    #if the contour is too small, ignore it
-    if cv2.contourArea(c) < conf["min_area"]:
-      continue
-    
-    #compute the bounding box for the contour, draw it on the frame, and update the text
-    (x,y,w,h) = cv2.boundingRect(c)
-    cv2.rectangle(frame,(x,y), (x+w, y+h), (0,255,0),2)
-    text = "Occupied"
-
   #draw the text and timestamp
   ts = timestamp.strftime("%A %d %B %Y %I:%M:%S%p")
   cv2.putText(frame, "Room Status: {}".format(text), (10,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255),2)
   cv2.putText(frame, ts, (10, frame.shape[0]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0,0,255),1)
+  
+  #check time relative to sunrise and sunset
+  now = dt.datetime.now()
+  if now.day != current_day:
+    sunrise, sunset = scrape_sun.get_times(url, 'span', 'three', now)
+    print(sunrise, sunset)
+    current_day = now.day
+
+  if now.hour in range(sunrise.hour, sunrise.hour + 3) or \
+     now.hour in range(sunset.hour - 3, sunset.hour):
+    if now.minute in range(0,60,5) and now.minute != current_minute:
+      current_minute = now.minute
+      text = "Occupied"
 
   #check to see if room is occupied
   if text == "Occupied":
-    #check to see if enough time has passed between uploads
-    if (timestamp - lastUploaded).seconds >= conf["min_upload_seconds"]:
-      #increment the motion counter
-      motionCounter += 1
-
-      #check to see if the number of frames with consistent motion is high enough
-      if motionCounter >= conf["min_motion_frames"]:
-
-        #check to see if dropbox should be used
-        if conf["use_dropbox"]:
-          #write the image to temporary file
-          t = TempImage()
-          cv2.imwrite(t.path, frame)
-
-          #upload the image to Dropbox and cleanup the temp image
-          print("[UPLOAD] {}".format(ts))
-          path = "/{base_path}/{timestamp}.jpg".format(
-              base_path=conf["dropbox_base_path"], timestamp=ts)
-          mode = dropbox.files.WriteMode.add
-          with open(t.path, 'rb') as f:
-              data = f.read()
-          try:
-             res = client.files_upload(
-                data, path, mode, mute=True)
-          except dropbox.exceptions.ApiError as err:
-                print('*** API error', err)
+    print("time to start")
+    
+    #write the image to temporary file
+    t = TempImage()
+    cv2.imwrite(t.path, frame)
+    
+    #check if we want to post to DropBox
+    if conf["use_dropbox"]:
+       #upload the image to Dropbox and cleanup the temp image
+       print("[UPLOAD] {}".format(ts))
+       path = "/{base_path}/{timestamp}.jpg".format(
+            base_path=conf["dropbox_base_path"], timestamp=ts)
+       mode = dropbox.files.WriteMode.add
+       with open(t.path, 'rb') as f:
+          data = f.read()
+       try:
+          res = client.files_upload(
+              data, path, mode, mute=True)
+       except dropbox.exceptions.ApiError as err:
+          print('*** API error', err)
             
-          #Send image to email address
-          if conf["use_email"]:
-              body = open("body.txt", "w+")
-              body.write("UPLOAD {}".format(ts))
-              body.close          
-              os.system(
-		"mpack -s 'Surveillance' -d {body} {path} {email}".format(
-		body="./body.txt", path=t.path, email=conf["email"]))
+    #Send image to email address
+    if conf["use_email"]:
+      body = open("body.txt", "w+")
+      body.write("UPLOAD {}".format(ts))
+      body.close          
+      os.system(
+         "mpack -s 'Surveillance' -d {body} {path} {email}".format(
+         body="./body.txt", path=t.path, email=conf["email"]))
 
-          #Save image to usbdrive
-          usbpath = '/mnt/usbdrive/photos'
-          if now.hour >= 12:
-            ampm = "PM"
-          else:
-            ampm = "AM"
-          new_image_path = os.path.join(usbpath, ampm, ts + '.jpg')
-          shutil.copy2(t.path, new_image_path)
+    #Save image to usbdrive
+    usbpath = '/mnt/usbdrive/photos'
+    if now.hour >= 12:
+      ampm = "PM"
+    else:
+      ampm = "AM"
+    print(ts)
+    new_image_path = os.path.join(usbpath, ampm, ts + '.jpg')
+    shutil.copy2(t.path, new_image_path)
 
-          t.cleanup()
-
-        #update the last uploaded timestamp and reset he motion couner
-        lastUploaded = timestamp
-        motionCounter = 0
-
-  #otherwise the room is not occupied
-  else:
-    motionCounter = 0
+    t.cleanup()
 
   #check to see if the frames should be displayed to screen
   if conf["show_video"]:
